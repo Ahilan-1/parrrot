@@ -62,6 +62,8 @@ def main(ctx: typer.Context) -> None:
             console.print("Try: pip install parrrot[all]")
             raise typer.Exit(1)
     else:
+        if not _startup_notice():
+            raise typer.Exit(0)
         asyncio.run(_chat_async())
 
 
@@ -72,6 +74,8 @@ def main(ctx: typer.Context) -> None:
 @app.command()
 def chat() -> None:
     """Start an interactive chat session."""
+    if not _startup_notice():
+        raise typer.Exit(0)
     asyncio.run(_chat_async())
 
 
@@ -102,6 +106,15 @@ async def _run_task(task: str) -> None:
     conf = cfg.load()
     name = conf["identity"].get("name", "Parrrot")
     console.print(f"\n[bold cyan]{name}[/bold cyan]: working on it...\n")
+    console.print(
+        Panel(
+            "[yellow]Heads up:[/yellow] The AI may struggle at first — "
+            "that's normal. It will work through it and find a way to "
+            "complete your task. Be patient and let it keep going.",
+            title="[bold yellow]AI Notice[/bold yellow]",
+            border_style="yellow",
+        )
+    )
 
     agent = Agent()
     try:
@@ -489,6 +502,30 @@ def hotkey(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _startup_notice() -> bool:
+    """
+    Show a recommendation to read devnote.md and ask the user to confirm
+    before continuing. Returns True if the user wants to proceed, False to exit.
+    """
+    console.print(
+        Panel(
+            "[bold]Before you start,[/bold] we recommend reading [bold cyan]devnote.md[/bold cyan] "
+            "in the project root — it covers known quirks with the AI (especially browser "
+            "compatibility) and what to expect when tasks take longer than usual.\n\n"
+            "[dim]Path: devnote.md[/dim]",
+            title="[bold cyan]Developer Note[/bold cyan]",
+            border_style="cyan",
+        )
+    )
+    try:
+        proceed = typer.confirm("Continue?", default=True)
+    except (EOFError, KeyboardInterrupt):
+        proceed = False
+    if not proceed:
+        console.print("[dim]Exiting. Run [bold]parrrot[/bold] again whenever you're ready.[/dim]")
+    return proceed
+
 
 def _nice_error(error: str) -> None:
     if "connection" in error.lower() or "refused" in error.lower():
