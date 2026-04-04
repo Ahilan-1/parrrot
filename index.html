@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parrrot — Personal AI Agent for Windows</title>
+  <meta name="description" content="Parrrot is a local-first AI agent that controls your PC, browses the web, manages files and remembers everything. No coding required."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+  /* ── RESET ─────────────────────────────────────────────────── */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+
+  /* ── TOKENS ────────────────────────────────────────────────── */
+  :root{
+    --bg:        #07070e;
+    --bg-1:      #0c0c16;
+    --bg-2:      #10101c;
+    --bg-3:      #141422;
+    --border:    rgba(255,255,255,0.07);
+    --border-h:  rgba(224,32,32,0.35);
+    --amber:     #e02020;
+    --amber-2:   #ff4f4f;
+    --amber-dim: rgba(224,32,32,0.1);
+    --amber-glow:rgba(224,32,32,0.18);
+    --teal:      #2dd4bf;
+    --violet:    #818cf8;
+    --red:       #f87171;
+    --green:     #34d399;
+    --t1:        #f0f0ff;
+    --t2:        #a0a0bb;
+    --t3:        #50506a;
+    --radius:    10px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+  }
+
+  /* ── BASE ──────────────────────────────────────────────────── */
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--bg);
+    color:var(--t1);
+    line-height:1.7;
+    overflow-x:hidden;
+    cursor:none;
+  }
+  ::selection{background:var(--amber);color:#07070e}
+  ::-webkit-scrollbar{width:3px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--amber);border-radius:2px}
+
+  /* ── CUSTOM CURSOR ─────────────────────────────────────────── */
+  #cursor-dot{
+    position:fixed;width:6px;height:6px;
+    background:var(--amber);border-radius:50%;
+    pointer-events:none;z-index:9999;
+    transform:translate(-50%,-50%);
+    transition:transform 0.1s,width 0.2s,height 0.2s,background 0.2s;
+  }
+  #cursor-ring{
+    position:fixed;width:32px;height:32px;
+    border:1px solid rgba(224,32,32,0.4);
+    border-radius:50%;pointer-events:none;z-index:9998;
+    transform:translate(-50%,-50%);
+    transition:transform 0.12s ease,width 0.25s,height 0.25s,border-color 0.25s;
+  }
+  body:has(a:hover) #cursor-ring,
+  body:has(button:hover) #cursor-ring{
+    width:48px;height:48px;border-color:var(--amber);
+  }
+
+  /* ── SCROLL PROGRESS ───────────────────────────────────────── */
+  #progress{
+    position:fixed;top:0;left:0;height:2px;
+    background:linear-gradient(90deg,#8b0000,var(--amber),var(--amber-2));
+    z-index:200;width:0%;transition:width 0.05s linear;
+    box-shadow:0 0 8px var(--amber);
+  }
+
+  /* ── NOISE TEXTURE OVERLAY ─────────────────────────────────── */
+  body::before{
+    content:'';
+    position:fixed;inset:0;z-index:1;
+    pointer-events:none;opacity:0.028;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-size:160px 160px;
+  }
+
+  /* ── LAYOUT ────────────────────────────────────────────────── */
+  .wrap{max-width:1100px;margin:0 auto;padding:0 32px;position:relative;z-index:2}
+  section{position:relative;z-index:2}
+
+  /* ── NAV ───────────────────────────────────────────────────── */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    padding:0;
+  }
+  nav.solid{
+    background:rgba(7,7,14,0.82);
+    backdrop-filter:blur(20px) saturate(1.4);
+    border-bottom:1px solid var(--border);
+  }
+  .nav-inner{
+    display:flex;align-items:center;justify-content:space-between;
+    height:60px;
+  }
+  .logo{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1.15rem;font-weight:700;
+    color:var(--t1);text-decoration:none;
+    letter-spacing:-0.3px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .logo-mark{
+    width:28px;height:28px;
+    background:linear-gradient(135deg,var(--amber) 0%,#8b0000 100%);
+    border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 14px rgba(224,32,32,0.3);
+  }
+  .logo-mark svg{width:14px;height:14px;fill:#07070e}
+  .logo span em{font-style:normal;color:var(--amber)}
+
+  .nav-links{display:flex;gap:28px;list-style:none}
+  .nav-links a{
+    font-size:0.84rem;font-weight:500;
+    color:var(--t2);text-decoration:none;
+    transition:color 0.2s;letter-spacing:0.2px;
+  }
+  .nav-links a:hover{color:var(--t1)}
+
+  .nav-right{display:flex;gap:10px;align-items:center}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:9px 20px;border-radius:var(--radius);
+    font-size:0.84rem;font-weight:600;
+    cursor:pointer;text-decoration:none;
+    transition:all 0.22s;border:none;
+    font-family:'Inter',sans-serif;
+    letter-spacing:0.1px;
+  }
+  .btn-ghost{
+    color:var(--t2);
+    background:transparent;
+    border:1px solid var(--border);
+  }
+  .btn-ghost:hover{
+    color:var(--t1);
+    border-color:rgba(255,255,255,0.15);
+    background:rgba(255,255,255,0.04);
+  }
+  .btn-amber{
+    background:var(--amber);
+    color:#07070e;
+    box-shadow:0 0 0 0 rgba(224,32,32,0.4);
+  }
+  .btn-amber:hover{
+    background:var(--amber-2);
+    box-shadow:0 0 0 6px rgba(224,32,32,0.12),0 4px 20px rgba(224,32,32,0.35);
+    transform:translateY(-1px);
+  }
+  .btn-lg{padding:13px 30px;font-size:0.95rem;border-radius:12px}
+  .btn-xl{padding:15px 36px;font-size:1rem;border-radius:14px}
+
+  /* ── HERO ──────────────────────────────────────────────────── */
+  #hero{
+    min-height:100vh;
+    display:flex;align-items:center;
+    padding:120px 0 80px;
+    position:relative;overflow:hidden;
+    text-align:center;
+  }
+
+  /* Ambient orbs */
+  .orb{
+    position:absolute;border-radius:50%;
+    filter:blur(80px);pointer-events:none;
+    animation:orb-drift 18s ease-in-out infinite alternate;
+  }
+  .orb-1{
+    width:600px;height:600px;
+    background:radial-gradient(circle,rgba(224,32,32,0.12) 0%,transparent 70%);
+    top:-100px;left:50%;transform:translateX(-50%);
+    animation-duration:20s;
+  }
+  .orb-2{
+    width:400px;height:400px;
+    background:radial-gradient(circle,rgba(129,140,248,0.08) 0%,transparent 70%);
+    bottom:0;right:-100px;
+    animation-duration:15s;animation-delay:-5s;
+  }
+  .orb-3{
+    width:300px;height:300px;
+    background:radial-gradient(circle,rgba(45,212,191,0.07) 0%,transparent 70%);
+    bottom:100px;left:-50px;
+    animation-duration:12s;animation-delay:-3s;
+  }
+  @keyframes orb-drift{
+    0%{transform:translateX(-50%) translateY(0) scale(1)}
+    50%{transform:translateX(-48%) translateY(-30px) scale(1.05)}
+    100%{transform:translateX(-52%) translateY(20px) scale(0.95)}
+  }
+  .orb-2{animation:orb-drift-2 15s ease-in-out infinite alternate}
+  .orb-3{animation:orb-drift-3 12s ease-in-out infinite alternate}
+  @keyframes orb-drift-2{0%{transform:translate(0,0)}100%{transform:translate(-40px,-60px)}}
+  @keyframes orb-drift-3{0%{transform:translate(0,0)}100%{transform:translate(30px,-40px)}}
+
+  /* Grid lines overlay */
+  #hero::after{
+    content:'';position:absolute;inset:0;z-index:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,0.022) 1px,transparent 1px);
+    background-size:80px 80px;
+    mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 30%,transparent 100%);
+    pointer-events:none;
+  }
+
+  .hero-inner{
+    position:relative;z-index:2;
+    max-width:860px;margin:0 auto;
+  }
+
+  .hero-label{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:5px 14px;
+    border:1px solid rgba(224,32,32,0.25);
+    background:rgba(224,32,32,0.06);
+    border-radius:100px;
+    font-size:0.75rem;font-weight:600;
+    color:var(--amber);
+    letter-spacing:1.2px;text-transform:uppercase;
+    margin-bottom:32px;
+  }
+  .hero-label .pulse{
+    width:5px;height:5px;border-radius:50%;
+    background:var(--amber);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(224,32,32,0.4)}50%{opacity:0.6;box-shadow:0 0 0 5px rgba(224,32,32,0)}}
+
+  h1.hero-h{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(2.8rem,6.5vw,5rem);
+    font-weight:700;line-height:1.05;
+    letter-spacing:-2px;
+    color:var(--t1);
+    margin-bottom:24px;
+  }
+  h1.hero-h .grad{
+    background:linear-gradient(135deg,var(--amber) 0%,var(--amber-2) 50%,#ff9f1c 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+  h1.hero-h .dim{color:var(--t3);font-weight:300}
+
+  .hero-sub{
+    font-size:1.1rem;color:var(--t2);
+    line-height:1.8;max-width:560px;margin:0 auto 44px;
+    font-weight:400;
+  }
+
+  .hero-actions{
+    display:flex;gap:12px;justify-content:center;flex-wrap:wrap;
+    margin-bottom:64px;
+  }
+
+  .hero-meta{
+    display:flex;align-items:center;justify-content:center;gap:40px;
+    flex-wrap:wrap;
+  }
+  .meta-item{
+    display:flex;align-items:center;gap:8px;
+    font-size:0.8rem;color:var(--t3);
+    font-weight:500;letter-spacing:0.2px;
+  }
+  .meta-item .dot{
+    width:4px;height:4px;border-radius:50%;background:var(--t3);
+  }
+  .meta-sep{width:1px;height:16px;background:var(--border)}
+
+  /* ── FEATURE BENTO ─────────────────────────────────────────── */
+  #features{padding:120px 0}
+  .sec-label{
+    display:inline-flex;align-items:center;gap:10px;
+    font-size:0.72rem;font-weight:600;
+    letter-spacing:2px;text-transform:uppercase;
+    color:var(--amber);margin-bottom:14px;
+  }
+  .sec-label::before{content:'';display:block;width:20px;height:1px;background:var(--amber)}
+  h2.sec-h{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(1.9rem,3.5vw,2.8rem);
+    font-weight:700;letter-spacing:-1.2px;
+    color:var(--t1);line-height:1.15;
+    margin-bottom:14px;
+  }
+  p.sec-sub{
+    font-size:1rem;color:var(--t2);
+    max-width:500px;line-height:1.8;
+  }
+  .features-intro{margin-bottom:56px}
+
+  .bento{
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    grid-auto-rows:auto;
+    gap:14px;
+  }
+  .bento-card{
+    background:var(--bg-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:28px 28px 30px;
+    position:relative;overflow:hidden;
+    transition:border-color 0.3s,transform 0.3s,box-shadow 0.3s;
+  }
+  .bento-card::before{
+    content:'';position:absolute;inset:0;
+    background:radial-gradient(circle at 0% 0%,rgba(224,32,32,0.05) 0%,transparent 60%);
+    opacity:0;transition:opacity 0.35s;pointer-events:none;
+  }
+  .bento-card:hover{
+    border-color:var(--border-h);
+    transform:translateY(-3px);
+    box-shadow:0 16px 48px rgba(0,0,0,0.5),0 0 0 1px rgba(224,32,32,0.08);
+  }
+  .bento-card:hover::before{opacity:1}
+
+  .bc-1{grid-column:span 4}
+  .bc-2{grid-column:span 4}
+  .bc-3{grid-column:span 4}
+  .bc-4{grid-column:span 8}
+  .bc-5{grid-column:span 4}
+  .bc-6{grid-column:span 4}
+  .bc-7{grid-column:span 4}
+  .bc-8{grid-column:span 4}
+
+  .card-num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.7rem;font-weight:500;
+    color:rgba(224,32,32,0.35);
+    letter-spacing:0.5px;
+    margin-bottom:18px;
+    display:block;
+  }
+  .card-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1.05rem;font-weight:600;
+    color:var(--t1);margin-bottom:8px;
+    letter-spacing:-0.3px;
+  }
+  .card-desc{
+    font-size:0.84rem;color:var(--t2);
+    line-height:1.7;
+  }
+  .card-tag{
+    display:inline-block;margin-top:16px;
+    padding:3px 10px;border-radius:6px;
+    font-size:0.7rem;font-weight:600;
+    letter-spacing:0.5px;
+    background:var(--amber-dim);
+    color:var(--amber);
+    border:1px solid rgba(224,32,32,0.2);
+  }
+  .card-tag.teal{
+    background:rgba(45,212,191,0.08);
+    color:var(--teal);border-color:rgba(45,212,191,0.2);
+  }
+  .card-tag.violet{
+    background:rgba(129,140,248,0.08);
+    color:var(--violet);border-color:rgba(129,140,248,0.2);
+  }
+  .card-tag.green{
+    background:rgba(52,211,153,0.08);
+    color:var(--green);border-color:rgba(52,211,153,0.2);
+  }
+
+  /* Wide card extras */
+  .bc-4 .card-title{font-size:1.2rem}
+  .bc-4 .card-desc{max-width:480px}
+  .hotkey-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    margin-top:18px;
+    padding:7px 14px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.8rem;color:var(--amber);
+    letter-spacing:0.5px;
+  }
+  .hotkey-badge kbd{
+    padding:2px 7px;
+    background:rgba(224,32,32,0.12);
+    border:1px solid rgba(224,32,32,0.25);
+    border-radius:5px;font-family:inherit;
+    font-size:0.78rem;color:var(--amber);
+  }
+
+  /* ── PITCH SECTION ─────────────────────────────────────────── */
+  #pitch{
+    padding:120px 0;
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,transparent,rgba(224,32,32,0.02) 50%,transparent);
+  }
+  .pitch-grid{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:80px;align-items:start;
+  }
+  .pitch-list{margin-top:32px;list-style:none}
+  .pitch-list li{
+    display:grid;grid-template-columns:auto 1fr;
+    gap:16px;padding:20px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .pitch-list li:last-child{border-bottom:none}
+  .pl-num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.78rem;font-weight:500;
+    color:rgba(224,32,32,0.3);
+    padding-top:3px;
+  }
+  .pl-text strong{
+    display:block;font-size:0.92rem;font-weight:600;
+    color:var(--t1);margin-bottom:4px;
+  }
+  .pl-text span{font-size:0.83rem;color:var(--t2);line-height:1.65}
+
+  .pitch-right{padding-top:52px}
+  .stat-grid{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:1px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);overflow:hidden;
+    background:var(--border);
+  }
+  .stat-cell{
+    background:var(--bg-2);
+    padding:28px 24px;
+  }
+  .stat-val{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:2.2rem;font-weight:700;
+    color:var(--amber);line-height:1;
+    margin-bottom:6px;
+    letter-spacing:-1px;
+  }
+  .stat-lbl{
+    font-size:0.8rem;color:var(--t3);
+    font-weight:500;
+  }
+
+  /* ── COMPARE ───────────────────────────────────────────────── */
+  #compare{padding:120px 0}
+  .compare-wrap{
+    margin-top:56px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-xl);
+    overflow:hidden;
+  }
+  table.ct{
+    width:100%;border-collapse:collapse;
+    font-size:0.875rem;
+  }
+  .ct thead tr{border-bottom:1px solid var(--border)}
+  .ct th{
+    padding:20px 24px;
+    text-align:left;font-weight:600;
+  }
+  .ct th:first-child{
+    font-size:0.75rem;font-weight:500;
+    color:var(--t3);letter-spacing:0.5px;
+  }
+  .ct th.th-us{
+    background:rgba(224,32,32,0.06);
+    border-left:1px solid rgba(224,32,32,0.2);
+    border-right:1px solid rgba(224,32,32,0.2);
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1rem;font-weight:700;color:var(--amber);
+  }
+  .th-badge{
+    display:block;font-size:0.68rem;
+    font-weight:600;letter-spacing:1px;
+    color:rgba(224,32,32,0.5);margin-top:3px;
+    text-transform:uppercase;font-family:'Inter',sans-serif;
+  }
+  .ct th.th-rival{
+    font-size:0.9rem;font-weight:600;color:var(--t3);
+  }
+  .ct th.th-rival small{
+    display:block;font-size:0.72rem;
+    color:var(--t3);font-weight:400;margin-top:2px;
+    opacity:0.7;
+  }
+  .ct td{
+    padding:14px 24px;
+    border-bottom:1px solid rgba(255,255,255,0.04);
+    vertical-align:middle;
+  }
+  .ct td:first-child{font-size:0.84rem;color:var(--t2);font-weight:500}
+  .ct td.td-us{
+    background:rgba(224,32,32,0.04);
+    border-left:1px solid rgba(224,32,32,0.12);
+    border-right:1px solid rgba(224,32,32,0.12);
+    text-align:center;
+  }
+  .ct td.td-rival{text-align:center}
+  .ct tbody tr:last-child td{border-bottom:none}
+  .ct tbody tr:hover td{background:rgba(255,255,255,0.015)}
+  .ct tbody tr:hover td.td-us{background:rgba(224,32,32,0.07)}
+
+  .c-yes{color:var(--green);font-size:0.9rem;font-weight:600}
+  .c-no{color:rgba(248,113,113,0.6);font-size:0.9rem}
+  .c-partial{
+    font-size:0.78rem;color:var(--t3);font-weight:500;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .c-partial::before{
+    content:'';display:block;width:5px;height:5px;
+    border-radius:50%;background:rgba(255,255,255,0.2);
+    flex-shrink:0;
+  }
+
+  /* ── DEVNOTE ───────────────────────────────────────────────── */
+  #devnote{padding:120px 0}
+  .dn-card{
+    background:var(--bg-2);
+    border:1px solid rgba(224,32,32,0.2);
+    border-radius:var(--radius-xl);
+    overflow:hidden;
+    box-shadow:0 0 60px rgba(224,32,32,0.04),0 24px 60px rgba(0,0,0,0.4);
+  }
+  .dn-head{
+    display:flex;align-items:center;gap:14px;
+    padding:18px 28px;
+    background:rgba(224,32,32,0.05);
+    border-bottom:1px solid rgba(224,32,32,0.15);
+  }
+  .dn-head .traffic{display:flex;gap:6px;align-items:center}
+  .dn-head .traffic span{
+    width:10px;height:10px;border-radius:50%;display:block;
+  }
+  .dn-head .title{
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.8rem;color:var(--t3);flex:1;text-align:center;
+    letter-spacing:0.5px;
+  }
+  .dn-head .ver{
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.72rem;color:var(--amber);
+    background:rgba(224,32,32,0.1);
+    padding:3px 10px;border-radius:6px;
+    border:1px solid rgba(224,32,32,0.2);
+    letter-spacing:0.5px;
+  }
+  .dn-body{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:1px;background:var(--border);
+  }
+  .dn-cell{
+    background:var(--bg-2);
+    padding:28px 28px 30px;
+    position:relative;
+  }
+  .dn-cell::before{
+    content:attr(data-type);
+    display:block;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.68rem;font-weight:500;letter-spacing:1px;
+    text-transform:uppercase;
+    margin-bottom:14px;
+  }
+  .dn-cell[data-type="warning"]::before{color:var(--red)}
+  .dn-cell[data-type="recommended"]::before{color:var(--green)}
+  .dn-cell[data-type="behavior"]::before{color:var(--teal)}
+  .dn-cell[data-type="models"]::before{color:var(--violet)}
+  .dn-cell h4{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:0.95rem;font-weight:600;
+    color:var(--t1);margin-bottom:8px;
+    letter-spacing:-0.2px;
+  }
+  .dn-cell p{font-size:0.84rem;color:var(--t2);line-height:1.7}
+  .dn-cell code{
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.8rem;color:var(--amber);
+    background:rgba(224,32,32,0.08);
+    padding:1px 6px;border-radius:4px;
+  }
+  .dn-footer{
+    padding:16px 28px;
+    background:rgba(0,0,0,0.25);
+    border-top:1px solid var(--border);
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.78rem;color:var(--amber);
+    letter-spacing:0.3px;
+  }
+
+  /* ── INSTALL ───────────────────────────────────────────────── */
+  #install{padding:120px 0}
+  .install-layout{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:60px;align-items:start;
+    margin-top:56px;
+  }
+  .install-steps{display:flex;flex-direction:column;gap:1px;background:var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .i-step{
+    background:var(--bg-2);
+    padding:24px 24px;
+    display:flex;gap:18px;
+    align-items:flex-start;
+    transition:background 0.2s;
+    cursor:default;
+  }
+  .i-step:hover{background:var(--bg-3)}
+  .i-step-n{
+    width:26px;height:26px;border-radius:50%;
+    border:1px solid var(--border-h);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.72rem;font-weight:600;
+    color:var(--amber);flex-shrink:0;
+    margin-top:1px;
+  }
+  .i-step h4{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:0.9rem;font-weight:600;
+    color:var(--t1);margin-bottom:4px;
+    letter-spacing:-0.2px;
+  }
+  .i-step p{font-size:0.82rem;color:var(--t2);line-height:1.6}
+  .i-step a{color:var(--amber);text-decoration:none;font-weight:500}
+  .i-step a:hover{text-decoration:underline}
+
+  .code-panel{
+    background:var(--bg-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+  }
+  .cp-head{
+    display:flex;align-items:center;gap:8px;
+    padding:14px 18px;
+    border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,0.02);
+  }
+  .cp-dot{width:9px;height:9px;border-radius:50%}
+  .cp-title{
+    flex:1;text-align:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.72rem;color:var(--t3);letter-spacing:0.3px;
+  }
+  .copy-btn{
+    background:rgba(224,32,32,0.08);
+    border:1px solid rgba(224,32,32,0.2);
+    border-radius:6px;padding:4px 12px;
+    font-size:0.72rem;font-weight:600;
+    color:var(--amber);cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:all 0.2s;
+  }
+  .copy-btn:hover{background:rgba(224,32,32,0.16)}
+
+  pre.cp-code{
+    padding:24px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.83rem;line-height:2;
+    color:#9cb3d0;overflow-x:auto;
+  }
+  pre.cp-code .cmt{color:#2e3f5c}
+  pre.cp-code .cmd{color:var(--green)}
+  pre.cp-code .str{color:var(--amber-2)}
+  pre.cp-code .kw {color:var(--teal)}
+  pre.cp-code .dim{color:#3a4a65}
+
+  .exe-pill{
+    margin-top:20px;
+    display:inline-flex;align-items:center;gap:10px;
+    padding:12px 20px;
+    background:var(--bg-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    width:100%;
+  }
+  .exe-icon{
+    width:32px;height:32px;
+    background:rgba(129,140,248,0.1);
+    border:1px solid rgba(129,140,248,0.2);
+    border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .exe-icon svg{width:14px;height:14px;fill:var(--violet)}
+  .exe-text{flex:1}
+  .exe-text strong{
+    display:block;font-size:0.84rem;font-weight:600;
+    color:var(--t1);margin-bottom:1px;
+  }
+  .exe-text span{font-size:0.76rem;color:var(--t3)}
+  .exe-badge{
+    padding:4px 10px;
+    background:rgba(129,140,248,0.1);
+    border:1px solid rgba(129,140,248,0.2);
+    border-radius:6px;
+    font-size:0.7rem;font-weight:600;
+    color:var(--violet);letter-spacing:0.5px;
+  }
+
+  /* ── CTA ───────────────────────────────────────────────────── */
+  #cta{padding:120px 0;text-align:center}
+  .cta-inner{
+    position:relative;
+    padding:80px 60px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-xl);
+    background:linear-gradient(135deg,rgba(224,32,32,0.06) 0%,transparent 50%);
+    overflow:hidden;
+  }
+  .cta-inner::before{
+    content:'';position:absolute;
+    top:-120px;left:50%;transform:translateX(-50%);
+    width:500px;height:500px;border-radius:50%;
+    background:radial-gradient(circle,rgba(224,32,32,0.1) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  .cta-eyebrow{
+    font-size:0.75rem;font-weight:600;letter-spacing:2px;
+    text-transform:uppercase;color:var(--amber);
+    margin-bottom:20px;display:block;
+  }
+  .cta-h{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(1.8rem,4vw,2.8rem);
+    font-weight:700;letter-spacing:-1.2px;
+    color:var(--t1);margin-bottom:16px;line-height:1.15;
+  }
+  .cta-p{
+    font-size:1rem;color:var(--t2);
+    max-width:440px;margin:0 auto 36px;line-height:1.8;
+  }
+  .cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+  /* ── FOOTER ────────────────────────────────────────────────── */
+  footer{
+    border-top:1px solid var(--border);
+    padding:40px 0;
+  }
+  .foot-inner{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;
+  }
+  .foot-logo{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1rem;font-weight:700;color:var(--t1);
+    display:flex;align-items:center;gap:8px;
+    text-decoration:none;
+  }
+  .foot-logo .lm{
+    width:22px;height:22px;border-radius:5px;
+    background:linear-gradient(135deg,var(--amber) 0%,#8b0000 100%);
+    flex-shrink:0;
+  }
+  .foot-logo em{color:var(--amber);font-style:normal}
+  .foot-note{font-size:0.8rem;color:var(--t3)}
+  .foot-note a{color:var(--amber);text-decoration:none}
+  .foot-links{display:flex;gap:22px;list-style:none}
+  .foot-links a{font-size:0.8rem;color:var(--t3);text-decoration:none;transition:color 0.2s}
+  .foot-links a:hover{color:var(--amber)}
+
+  /* ── DIVIDER ───────────────────────────────────────────────── */
+  .hr{height:1px;background:linear-gradient(90deg,transparent,var(--border) 30%,var(--border) 70%,transparent)}
+
+  /* ── REVEAL ────────────────────────────────────────────────── */
+  .r{opacity:0;transform:translateY(24px);transition:opacity 0.65s ease,transform 0.65s ease}
+  .r.v{opacity:1;transform:translateY(0)}
+  .r.d1{transition-delay:0.08s}.r.d2{transition-delay:0.16s}
+  .r.d3{transition-delay:0.24s}.r.d4{transition-delay:0.32s}
+  .r.d5{transition-delay:0.4s}
+
+  /* ── RESPONSIVE ────────────────────────────────────────────── */
+  @media(max-width:960px){
+    .bento{grid-template-columns:1fr 1fr}
+    .bc-1,.bc-2,.bc-3,.bc-4,.bc-5,.bc-6,.bc-7,.bc-8{grid-column:span 1}
+    .bc-4{grid-column:span 2}
+    .pitch-grid{grid-template-columns:1fr}
+    .install-layout{grid-template-columns:1fr}
+    .dn-body{grid-template-columns:1fr}
+    .nav-links{display:none}
+  }
+  @media(max-width:640px){
+    .bento{grid-template-columns:1fr}
+    .bc-4{grid-column:span 1}
+    .stat-grid{grid-template-columns:1fr 1fr}
+    .cta-inner{padding:48px 24px}
+    .wrap{padding:0 20px}
+    body{cursor:auto}
+    #cursor-dot,#cursor-ring{display:none}
+    h1.hero-h{letter-spacing:-1px}
+  }
+  </style>
+</head>
+<body>
+
+<!-- Cursor -->
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<!-- Scroll progress -->
+<div id="progress"></div>
+
+<!-- ── NAV ─────────────────────────────────────────────────────── -->
+<nav id="nav">
+  <div class="wrap nav-inner">
+    <a href="#hero" class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C8.5 2 6 4.5 6 7c0 1.5.6 2.8 1.6 3.8L6 13h4l1-2h2l1 2h4l-1.6-2.2C16.4 9.8 17 8.5 17 7c0-2.5-2.5-5-5-5zm0 2.5c1.4 0 2.5 1.1 2.5 2.5S13.4 9.5 12 9.5 9.5 8.4 9.5 7 10.6 4.5 12 4.5zm-2 12v5h4v-5h-4z"/>
+        </svg>
+      </div>
+      <span>Parr<em>rrot</em></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Capabilities</a></li>
+      <li><a href="#compare">Compare</a></li>
+      <li><a href="#devnote">Dev Notes</a></li>
+      <li><a href="#install">Install</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="https://github.com/Ahilan-1/parrrot" target="_blank" class="btn btn-ghost">GitHub</a>
+      <a href="#install" class="btn btn-amber">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── HERO ─────────────────────────────────────────────────────── -->
+<section id="hero">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="wrap">
+    <div class="hero-inner">
+      <div class="hero-label r">
+        <span class="pulse"></span>
+        v0.1.0 &nbsp;&middot;&nbsp; Windows Native &nbsp;&middot;&nbsp; Free &amp; Open Source
+      </div>
+
+      <h1 class="hero-h r d1">
+        Your AI doesn't<br/>
+        <span class="grad">just talk.</span><br/>
+        <span class="dim">It acts.</span>
+      </h1>
+
+      <p class="hero-sub r d2">
+        Parrrot is a local-first personal AI agent that controls your PC,
+        browses the web, manages files, and remembers everything across sessions.
+        No coding. No cloud lock-in. No subscriptions.
+      </p>
+
+      <div class="hero-actions r d3">
+        <a href="#install" class="btn btn-amber btn-xl">Get Parrrot Free</a>
+        <a href="https://github.com/Ahilan-1/parrrot" target="_blank" class="btn btn-ghost btn-xl">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <div class="hero-meta r d4">
+        <span class="meta-item">16+ built-in tools</span>
+        <span class="meta-sep"></span>
+        <span class="meta-item">Full PC control</span>
+        <span class="meta-sep"></span>
+        <span class="meta-item">Persistent memory</span>
+        <span class="meta-sep"></span>
+        <span class="meta-item">Zero code required</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ── FEATURES BENTO ──────────────────────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <div class="features-intro r">
+      <div class="sec-label">Capabilities</div>
+      <h2 class="sec-h">Everything a real<br/>agent should do.</h2>
+      <p class="sec-sub">
+        Not a chatbot wrapper. Parrrot has actual tools — 16 of them — wired
+        directly to your operating system.
+      </p>
+    </div>
+
+    <div class="bento">
+
+      <div class="bento-card bc-1 r d1">
+        <span class="card-num">01</span>
+        <div class="card-title">Full PC Control</div>
+        <div class="card-desc">Mouse, keyboard, window management. Operates your computer visually the way you would.</div>
+        <span class="card-tag">Windows Native</span>
+      </div>
+
+      <div class="bento-card bc-2 r d2">
+        <span class="card-num">02</span>
+        <div class="card-title">Real Browser Automation</div>
+        <div class="card-desc">Chrome DevTools Protocol and Playwright. Not simulated — an actual browser you can watch work.</div>
+        <span class="card-tag teal">CDP + Playwright</span>
+      </div>
+
+      <div class="bento-card bc-3 r d3">
+        <span class="card-num">03</span>
+        <div class="card-title">Persistent Memory</div>
+        <div class="card-desc">Remembers facts, events, and conversations across every session. Stored locally at <code style="font-family:JetBrains Mono,monospace;font-size:0.78rem;color:var(--amber)">~/.parrrot/</code></div>
+        <span class="card-tag green">Always Private</span>
+      </div>
+
+      <div class="bento-card bc-4 r d1">
+        <span class="card-num">04</span>
+        <div class="card-title">Runs in the Background</div>
+        <div class="card-desc">
+          Daemon mode executes autonomously while you work. Access it instantly from anywhere on your desktop.
+        </div>
+        <div class="hotkey-badge">
+          <kbd>Win</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>
+          <span style="color:var(--t3);font-size:0.75rem;font-family:Inter,sans-serif">&mdash; global hotkey</span>
+        </div>
+      </div>
+
+      <div class="bento-card bc-5 r d2">
+        <span class="card-num">05</span>
+        <div class="card-title">File &amp; Shell Mastery</div>
+        <div class="card-desc">Read, write, move, zip files. Run any terminal command and capture output.</div>
+        <span class="card-tag">Full Access</span>
+      </div>
+
+      <div class="bento-card bc-6 r d1">
+        <span class="card-num">06</span>
+        <div class="card-title">Screen Vision</div>
+        <div class="card-desc">Screenshots and OCR via Tesseract. If you can see it on screen, Parrrot can read it.</div>
+        <span class="card-tag violet">Tesseract OCR</span>
+      </div>
+
+      <div class="bento-card bc-7 r d2">
+        <span class="card-num">07</span>
+        <div class="card-title">Drop-in Skills</div>
+        <div class="card-desc">Extend with plain Python scripts. Drop a file in <code style="font-family:JetBrains Mono,monospace;font-size:0.78rem;color:var(--amber)">~/.parrrot/skills/</code> and it runs.</div>
+        <span class="card-tag">Extensible</span>
+      </div>
+
+      <div class="bento-card bc-8 r d3">
+        <span class="card-num">08</span>
+        <div class="card-title">Hybrid Cloud Escalation</div>
+        <div class="card-desc">Local first. If complexity demands it, escalates automatically to Ollama Cloud. You control when.</div>
+        <span class="card-tag green">Local First</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ── PITCH ────────────────────────────────────────────────────── -->
+<section id="pitch">
+  <div class="wrap">
+    <div class="pitch-grid">
+      <div class="r">
+        <div class="sec-label">Built Different</div>
+        <h2 class="sec-h">AI that acts<br/>for everyone.</h2>
+        <p class="sec-sub">
+          Other tools expect you to work like a developer.
+          Parrrot just wants to know what you need done.
+        </p>
+
+        <ul class="pitch-list">
+          <li>
+            <span class="pl-num">01</span>
+            <div class="pl-text">
+              <strong>Zero technical knowledge required</strong>
+              <span>Plain English. No flags, no syntax, no terminal expertise.</span>
+            </div>
+          </li>
+          <li>
+            <span class="pl-num">02</span>
+            <div class="pl-text">
+              <strong>Windows-first, not an afterthought</strong>
+              <span>Native UI automation, toast notifications, global hotkey. Built for Windows from day one.</span>
+            </div>
+          </li>
+          <li>
+            <span class="pl-num">03</span>
+            <div class="pl-text">
+              <strong>Your data stays on your machine</strong>
+              <span>Everything lives at <code style="font-family:JetBrains Mono,monospace;font-size:0.82rem;color:var(--amber)">~/.parrrot/</code> locally. No sync unless you ask.</span>
+            </div>
+          </li>
+          <li>
+            <span class="pl-num">04</span>
+            <div class="pl-text">
+              <strong>General purpose, not enterprise</strong>
+              <span>Not a business workflow engine. A personal AI for your daily life on your PC.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="pitch-right r d2">
+        <div class="stat-grid">
+          <div class="stat-cell">
+            <div class="stat-val">16+</div>
+            <div class="stat-lbl">Built-in tools</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val">0</div>
+            <div class="stat-lbl">Lines of code needed</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val">100%</div>
+            <div class="stat-lbl">Windows native</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val">MIT</div>
+            <div class="stat-lbl">Free &amp; open source</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ── COMPARE ──────────────────────────────────────────────────── -->
+<section id="compare">
+  <div class="wrap">
+    <div class="r">
+      <div class="sec-label">Comparison</div>
+      <h2 class="sec-h">Parrrot vs. the field.</h2>
+      <p class="sec-sub">
+        OpenClaw is free and capable — but designed for developers who can configure it.
+        Claude Dispatch is polished but Mac-only, cloud-dependent, and starts at $100/mo.
+        Parrrot is the only one that's free, Windows-native, local, and needs zero technical knowledge.
+      </p>
+    </div>
+
+    <div class="compare-wrap r d2">
+      <table class="ct">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="th-us">
+              Parrrot
+              <span class="th-badge">You are here</span>
+            </th>
+            <th class="th-rival">
+              OpenClaw
+              <small>Free &middot; Open Source &middot; Developer tool</small>
+            </th>
+            <th class="th-rival">
+              Claude Dispatch
+              <small>Mac only &middot; From $100/mo</small>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>For non-coders</td>
+            <td class="td-us"><span class="c-yes">Yes — plain English</span></td>
+            <td class="td-rival"><span class="c-no">No — technical setup required</span></td>
+            <td class="td-rival"><span class="c-partial">Partial — needs Mac + subscription</span></td>
+          </tr>
+          <tr>
+            <td>Windows native</td>
+            <td class="td-us"><span class="c-yes">Built for Windows first</span></td>
+            <td class="td-rival"><span class="c-partial">Cross-platform, not Windows-first</span></td>
+            <td class="td-rival"><span class="c-no">Mac only</span></td>
+          </tr>
+          <tr>
+            <td>Full PC control</td>
+            <td class="td-us"><span class="c-yes">Mouse, keyboard, windows</span></td>
+            <td class="td-rival"><span class="c-partial">Files, shell &amp; apps</span></td>
+            <td class="td-rival"><span class="c-partial">Limited — opens apps, runs code</span></td>
+          </tr>
+          <tr>
+            <td>Real browser automation</td>
+            <td class="td-us"><span class="c-yes">CDP + Playwright</span></td>
+            <td class="td-rival"><span class="c-yes">CDP via Browser Relay</span></td>
+            <td class="td-rival"><span class="c-yes">Yes — web browsing &amp; forms</span></td>
+          </tr>
+          <tr>
+            <td>Persistent local memory</td>
+            <td class="td-us"><span class="c-yes">Local — cross-session</span></td>
+            <td class="td-rival"><span class="c-partial">Agent memory — API dependent</span></td>
+            <td class="td-rival"><span class="c-no">Cloud only — not local</span></td>
+          </tr>
+          <tr>
+            <td>Runs in background</td>
+            <td class="td-us"><span class="c-yes">Daemon + Win+Shift+P hotkey</span></td>
+            <td class="td-rival"><span class="c-partial">Limited — active session</span></td>
+            <td class="td-rival"><span class="c-yes">Yes — async, send from phone</span></td>
+          </tr>
+          <tr>
+            <td>General everyday productivity</td>
+            <td class="td-us"><span class="c-yes">Email, files, web, any app</span></td>
+            <td class="td-rival"><span class="c-no">Dev workflows &amp; API automation</span></td>
+            <td class="td-rival"><span class="c-partial">General — but cloud &amp; Mac only</span></td>
+          </tr>
+          <tr>
+            <td>Requires coding knowledge</td>
+            <td class="td-us" style="color:var(--green);font-weight:600;font-size:0.85rem">None</td>
+            <td class="td-rival" style="color:var(--red);font-size:0.82rem">Yes — developer tool</td>
+            <td class="td-rival" style="color:var(--green);font-size:0.85rem">No</td>
+          </tr>
+          <tr>
+            <td>Local &amp; private by default</td>
+            <td class="td-us"><span class="c-yes">Runs on your machine</span></td>
+            <td class="td-rival"><span class="c-partial">Cloud API calls</span></td>
+            <td class="td-rival"><span class="c-no">Cloud always — Anthropic servers</span></td>
+          </tr>
+          <tr>
+            <td>Free to use</td>
+            <td class="td-us"><span class="c-yes">Free — MIT license</span></td>
+            <td class="td-rival"><span class="c-yes">Free &amp; open source</span></td>
+            <td class="td-rival"><span class="c-no">$100–$200/mo (Max plan)</span></td>
+          </tr>
+          <tr>
+            <td>Extensible / custom skills</td>
+            <td class="td-us"><span class="c-yes">Drop-in Python files</span></td>
+            <td class="td-rival"><span class="c-yes">5,400+ skills registry</span></td>
+            <td class="td-rival"><span class="c-partial">Limited — no custom skills</span></td>
+          </tr>
+          <tr>
+            <td>Works offline</td>
+            <td class="td-us"><span class="c-yes">Local-first, optional cloud</span></td>
+            <td class="td-rival"><span class="c-no">Requires internet + API</span></td>
+            <td class="td-rival"><span class="c-no">Requires internet + subscription</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ── DEVNOTE ──────────────────────────────────────────────────── -->
+<section id="devnote">
+  <div class="wrap">
+    <div class="r">
+      <div class="sec-label">Transparency</div>
+      <h2 class="sec-h">Honest notes before<br/>you get started.</h2>
+      <p class="sec-sub">
+        Version 0.1.0. We'd rather tell you the quirks upfront.
+      </p>
+    </div>
+
+    <div class="dn-card r d2">
+      <div class="dn-head">
+        <div class="traffic">
+          <span style="background:#f87171"></span>
+          <span style="background:var(--amber)"></span>
+          <span style="background:var(--green)"></span>
+        </div>
+        <div class="title">devnotes.md &mdash; v0.1.0</div>
+        <div class="ver">Read Before First Run</div>
+      </div>
+
+      <div class="dn-body">
+        <div class="dn-cell" data-type="warning">
+          <h4>Chrome Compatibility Issue</h4>
+          <p>The agent <strong style="color:var(--t1)">really struggles with Chrome.</strong> If you have it installed, we strongly recommend uninstalling it before running Parrrot. Tasks will still complete — they just take a longer, harder path.</p>
+        </div>
+
+        <div class="dn-cell" data-type="recommended">
+          <h4>Use Edge or Firefox Instead</h4>
+          <p>Parrrot works significantly better with Microsoft Edge (built into Windows) or Firefox. Edge is our recommendation — it's already on your machine. No setup required.</p>
+        </div>
+
+        <div class="dn-cell" data-type="behavior">
+          <h4>Let It Work Through Failures</h4>
+          <p>If the agent stumbles — do not interrupt it. It will try alternative methods, different tools, take more steps. This is completely normal behavior. Give it time and it will get there.</p>
+        </div>
+
+        <div class="dn-cell" data-type="models">
+          <h4>Ollama Cloud Required</h4>
+          <p>This build uses <code>qwen3.5:cloud</code> and <code>minimax-m2.7:cloud</code> via Ollama's cloud inference. You need Ollama installed plus an Ollama Cloud account. Models don't run locally yet — that's coming.</p>
+        </div>
+      </div>
+
+      <div class="dn-footer">
+        tl;dr &mdash; uninstall Chrome, use Edge or Firefox, and if something goes wrong just let the agent keep going.
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ── INSTALL ──────────────────────────────────────────────────── -->
+<section id="install">
+  <div class="wrap">
+    <div class="r">
+      <div class="sec-label">Installation</div>
+      <h2 class="sec-h">Get running in<br/>under two minutes.</h2>
+      <p class="sec-sub">
+        Clone from GitHub, install, and run. That's it.
+      </p>
+    </div>
+
+    <div class="install-layout">
+
+      <div class="r d1">
+        <div class="install-steps">
+          <div class="i-step">
+            <div class="i-step-n">1</div>
+            <div>
+              <h4>Install Prerequisites</h4>
+              <p>You need <a href="https://python.org" target="_blank">Python 3.11+</a> and <a href="https://ollama.com" target="_blank">Ollama</a> installed. You'll also need an Ollama Cloud account for the AI models to run.</p>
+            </div>
+          </div>
+          <div class="i-step">
+            <div class="i-step-n">2</div>
+            <div>
+              <h4>Clone from GitHub</h4>
+              <p>All releases are on GitHub. Clone the repo directly — PyPI packaging is secondary, GitHub is the source of truth.</p>
+            </div>
+          </div>
+          <div class="i-step">
+            <div class="i-step-n">3</div>
+            <div>
+              <h4>Run the Setup Wizard</h4>
+              <p>On first launch, an interactive wizard walks you through model selection, permissions, and assistant identity. Takes about 2 minutes.</p>
+            </div>
+          </div>
+          <div class="i-step">
+            <div class="i-step-n">4</div>
+            <div>
+              <h4>Start Parrrot</h4>
+              <p>Use <code style="font-family:JetBrains Mono,monospace;font-size:0.8rem;color:var(--amber)">parrrot chat</code> for interactive mode or <code style="font-family:JetBrains Mono,monospace;font-size:0.8rem;color:var(--amber)">parrrot daemon</code> for background operation.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="exe-pill">
+          <div class="exe-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 5.75A2.75 2.75 0 0 1 5.75 3h12.5A2.75 2.75 0 0 1 21 5.75v12.5A2.75 2.75 0 0 1 18.25 21H5.75A2.75 2.75 0 0 1 3 18.25V5.75zm2.75-1.25a1.25 1.25 0 0 0-1.25 1.25v12.5a1.25 1.25 0 0 0 1.25 1.25h12.5a1.25 1.25 0 0 0 1.25-1.25V5.75a1.25 1.25 0 0 0-1.25-1.25H5.75z"/><path d="M8 10h8v1.5H8V10zm0 3h5v1.5H8V13z"/></svg>
+          </div>
+          <div class="exe-text">
+            <strong>Windows .exe Installer</strong>
+            <span>One-click install — no Python or terminal required</span>
+          </div>
+          <span class="exe-badge">Coming Soon</span>
+        </div>
+      </div>
+
+      <div class="r d2">
+        <div class="code-panel">
+          <div class="cp-head">
+            <span class="cp-dot" style="background:#f87171"></span>
+            <span class="cp-dot" style="background:var(--amber)"></span>
+            <span class="cp-dot" style="background:var(--green)"></span>
+            <span class="cp-title">Windows Terminal / PowerShell</span>
+            <button class="copy-btn" id="main-copy">Copy all</button>
+          </div>
+          <pre class="cp-code" id="main-code"><span class="cmt"># Clone from GitHub</span>
+<span class="cmd">git</span> clone https://github.com/Ahilan-1/parrrot
+<span class="cmd">cd</span> parrrot
+
+<span class="cmt"># Install</span>
+<span class="cmd">python</span> setup.py install
+
+<span class="cmt"># First launch — runs setup wizard</span>
+<span class="cmd">parrrot</span>
+
+<span class="cmt"># Daily use</span>
+<span class="cmd">parrrot</span> chat
+<span class="cmd">parrrot</span> <span class="str">"open Spotify and play lofi hip hop"</span>
+<span class="cmd">parrrot</span> daemon
+
+<span class="cmt"># Dev install (with all extras)</span>
+<span class="cmd">pip</span> install <span class="kw">-e</span> <span class="str">".[dev,all]"</span></pre>
+        </div>
+
+        <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="code-panel">
+            <div class="cp-head">
+              <span class="cp-title">Config</span>
+            </div>
+            <pre class="cp-code" style="padding:16px"><span class="dim">~/.parrrot/</span>
+<span class="kw">config.toml</span>
+<span class="kw">memory/</span>
+<span class="kw">skills/</span></pre>
+          </div>
+          <div class="code-panel">
+            <div class="cp-head">
+              <span class="cp-title">Quick commands</span>
+            </div>
+            <pre class="cp-code" style="padding:16px"><span class="cmd">parrrot</span> memory
+<span class="cmd">parrrot</span> skills
+<span class="cmd">parrrot</span> config
+<span class="cmd">parrrot</span> --help</pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ── CTA ──────────────────────────────────────────────────────── -->
+<section id="cta">
+  <div class="wrap">
+    <div class="cta-inner r">
+      <span class="cta-eyebrow">Get Started Today</span>
+      <h2 class="cta-h">Your PC deserves<br/>better than a chatbox.</h2>
+      <p class="cta-p">
+        Free, open source, and runs on your machine.
+        No subscription. No data harvesting. No coding needed.
+      </p>
+      <div class="cta-btns">
+        <a href="https://github.com/Ahilan-1/parrrot" target="_blank" class="btn btn-amber btn-xl">Clone from GitHub</a>
+        <a href="#features" class="btn btn-ghost btn-xl">See all capabilities</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────── -->
+<footer>
+  <div class="wrap">
+    <div class="foot-inner">
+      <a href="#hero" class="foot-logo">
+        <div class="lm"></div>
+        Parr<em>rrot</em>
+      </a>
+      <p class="foot-note">
+        MIT License &mdash; Made by <strong style="color:var(--t1)">Ahilan</strong>
+        &mdash; <a href="https://github.com/Ahilan-1/parrrot" target="_blank">GitHub</a>
+      </p>
+      <ul class="foot-links">
+        <li><a href="#features">Capabilities</a></li>
+        <li><a href="#compare">Compare</a></li>
+        <li><a href="#devnote">Dev Notes</a></li>
+        <li><a href="#install">Install</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<!-- ── SCRIPTS ───────────────────────────────────────────────────── -->
+<script>
+// ── Custom cursor ──────────────────────────────────────────────
+const dot  = document.getElementById('cursor-dot');
+const ring = document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px'});
+(function animRing(){rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(animRing)})();
+
+// ── Scroll progress ────────────────────────────────────────────
+const bar=document.getElementById('progress');
+window.addEventListener('scroll',()=>{
+  const p=(window.scrollY/(document.body.scrollHeight-window.innerHeight))*100;
+  bar.style.width=p+'%';
+});
+
+// ── Nav solid on scroll ────────────────────────────────────────
+window.addEventListener('scroll',()=>{
+  document.getElementById('nav').classList.toggle('solid',window.scrollY>40);
+});
+
+// ── Reveal on scroll ───────────────────────────────────────────
+const io=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v')});
+},{threshold:0.08});
+document.querySelectorAll('.r').forEach(el=>io.observe(el));
+
+// ── Smooth anchor ─────────────────────────────────────────────
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const t=document.querySelector(a.getAttribute('href'));
+    if(!t)return;e.preventDefault();
+    window.scrollTo({top:t.offsetTop-68,behavior:'smooth'});
+  });
+});
+
+// ── Copy button ────────────────────────────────────────────────
+document.getElementById('main-copy').addEventListener('click',function(){
+  const code=document.getElementById('main-code').innerText;
+  navigator.clipboard.writeText(code).then(()=>{
+    this.textContent='Copied!';
+    this.style.color='var(--green)';
+    setTimeout(()=>{this.textContent='Copy all';this.style.color='';},2000);
+  });
+});
+</script>
+</body>
+</html>
