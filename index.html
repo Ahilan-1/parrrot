@@ -1173,13 +1173,13 @@
 
       <div class="dn-body">
         <div class="dn-cell" data-type="warning">
-          <h4>Chrome Compatibility Issue</h4>
-          <p>The agent <strong style="color:var(--t1)">really struggles with Chrome.</strong> If you have it installed, we strongly recommend uninstalling it before running Parrrot. Tasks will still complete — they just take a longer, harder path.</p>
+          <h4>Chrome Doesn't Work — Use Chromium</h4>
+          <p>Parrrot's browser automation is built for <strong style="color:var(--t1)">Chromium</strong>, not Google Chrome. Chrome includes proprietary layers that break CDP. If you don't have Chromium, <a href="https://chromium.woolyss.com/" target="_blank" rel="noopener" style="color:var(--teal)">download it here</a> — it's free and looks identical to Chrome.</p>
         </div>
 
         <div class="dn-cell" data-type="recommended">
-          <h4>Use Edge or Firefox Instead</h4>
-          <p>Parrrot works significantly better with Microsoft Edge (built into Windows) or Firefox. Edge is our recommendation — it's already on your machine. No setup required.</p>
+          <h4>Recommended Browsers</h4>
+          <p><strong style="color:var(--t1)">Chromium</strong> is best. <strong style="color:var(--t1)">Microsoft Edge</strong> (already on Windows) and <strong style="color:var(--t1)">Firefox</strong> also work well. Avoid regular Google Chrome — it will cause automation failures.</p>
         </div>
 
         <div class="dn-cell" data-type="behavior">
@@ -1194,7 +1194,7 @@
       </div>
 
       <div class="dn-footer">
-        tl;dr &mdash; uninstall Chrome, use Edge or Firefox, and if something goes wrong just let the agent keep going.
+        tl;dr &mdash; Chrome breaks automation. Use Chromium (download it free), Edge, or Firefox. If something goes wrong, let the agent keep going.
       </div>
     </div>
   </div>

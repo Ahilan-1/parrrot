@@ -1,15 +1,23 @@
 # Developer Notes
 
-## Chrome Compatibility Issue
+## Browser Compatibility
 
-The agent **really struggles to work with Chrome.** If you have Chrome installed, we strongly recommend uninstalling it.
+**Chrome does not work reliably with Parrrot.** The CDP (Chrome DevTools Protocol) automation is built and tested against **Chromium**, not Google Chrome.
 
-The agent will always find a way to complete your task — but without Chrome it will take a longer path to get there. It may use alternative methods, open different tools, or take more steps than usual. That is completely normal.
+If you do not have Chromium installed, please download it:
+- **Windows / Mac / Linux:** https://www.chromium.org/getting-the-chromium-source-code/ — or search "download Chromium browser" and grab a build from https://chromium.woolyss.com/
 
-**Use Edge or Firefox instead.** The agent works significantly better with both of these browsers.
+> Chrome and Chromium look identical but Chrome includes proprietary layers that break CDP automation. Chromium is the open-source version and is what Parrrot expects.
+
+The agent will still try to complete your task without a working browser — it will take a longer path and use fallback tools. That is normal. But for best results, use Chromium.
+
+**Recommended browsers (in order):**
+1. **Chromium** — best compatibility, what Parrrot is built for
+2. **Microsoft Edge** — works well, built into Windows
+3. **Firefox** — works for most tasks
 
 ---
 
-If the agent still cannot complete the task after trying — please be patient and let it work through it on its own. Do not interrupt it. Give it the time it needs and it will get there.
+If the agent stumbles, do not interrupt it. Let it try alternative methods and it will get there.
 
-> tl;dr — uninstall Chrome, use Edge or Firefox, and if something goes wrong just forgive it and let the agent keep going.
+> tl;dr — Chrome doesn't work, Chromium does. Download Chromium if you don't have it. Edge and Firefox also work.

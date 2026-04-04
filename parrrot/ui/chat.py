@@ -7,6 +7,7 @@ https://github.com/Ahilan-1/parrrot
 from __future__ import annotations
 
 import asyncio
+import random
 import sys
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,30 @@ console = Console()
 # Persistent history file
 _HISTORY_FILE = Path.home() / ".parrrot" / "history"
 
+# Fun verbs for the thinking status — shown while the agent is running
+_THINKING_VERBS = [
+    "cooking",
+    "brewing",
+    "crafting",
+    "conjuring",
+    "wiring",
+    "crunching",
+    "plotting",
+    "scheming",
+    "assembling",
+    "forging",
+    "baking",
+    "distilling",
+    "engineering",
+    "summoning",
+    "weaving",
+    "manifesting",
+    "computing",
+]
+
+# Buffer for tool events — filled during agent run, printed after answer if verbose
+_tool_event_buffer: list[tuple[str, str, object]] = []
+
 # All slash commands available in chat
 _SLASH_COMMANDS = [
     "/help",
@@ -38,6 +63,7 @@ _SLASH_COMMANDS = [
     "/tools",
     "/model",
     "/verbose",
+    "/v",
     "/compact",
     "/history",
     "/hotkey",
@@ -221,28 +247,56 @@ async def run_chat(one_shot_message: Optional[str] = None) -> None:
 async def _handle_message(
     agent, name: str, user_input: str, verbose: bool = False
 ) -> None:
-    conf = cfg.load()
-    show_tools = conf["ui"].get("show_tool_calls", True) or verbose
-
-    console.print()
-    console.print(f"  [bold green]{name}[/bold green]:", end=" ")
+    _tool_event_buffer.clear()
 
     response_tokens: list[str] = []
 
-    async def stream_token(token: str) -> None:
+    async def collect_token(token: str) -> None:
         response_tokens.append(token)
-        console.print(token, end="", highlight=False)
+
+    verb = random.choice(_THINKING_VERBS)
 
     try:
-        response = await agent.think_and_act(user_input, stream_callback=stream_token)
-        if not response_tokens:
+        with console.status(
+            f"[dim cyan]{name} is {verb}…[/dim cyan]", spinner="dots"
+        ):
+            response = await agent.think_and_act(user_input, stream_callback=collect_token)
+
+        full_response = "".join(response_tokens) or response or ""
+
+        if full_response.strip():
             try:
-                md = Markdown(response)
-                console.print(md)
+                md = Markdown(full_response)
             except Exception:
-                console.print(response)
-        else:
+                md = full_response  # type: ignore[assignment]
+
             console.print()
+            console.print(
+                Panel(
+                    md,
+                    title=f"[bold green]{name}[/bold green]",
+                    border_style="green",
+                    box=box.ROUNDED,
+                    padding=(0, 1),
+                )
+            )
+        else:
+            console.print(f"\n  [dim]{name}: (no response)[/dim]")
+
+        # Show tool trace after the answer — only when verbose is on
+        if verbose and _tool_event_buffer:
+            console.print()
+            console.print("  [dim]── tool trace ──[/dim]")
+            for event_type, tool_name, data in _tool_event_buffer:
+                if event_type == "call":
+                    args_preview = ", ".join(
+                        f"{k}={repr(v)[:30]}" for k, v in (data or {}).items()  # type: ignore[union-attr]
+                    )
+                    console.print(f"  [dim cyan]↳ {tool_name}({args_preview})[/dim cyan]")
+                else:
+                    preview = str(data)[:100].replace("\n", " ")
+                    console.print(f"  [dim green]  ✓ {preview}{'…' if len(str(data)) > 100 else ''}[/dim green]")
+
     except Exception as e:
         console.print()
         _show_error(name, str(e))
@@ -251,19 +305,11 @@ async def _handle_message(
 
 
 async def _on_tool_call(tool_name: str, args: dict) -> None:
-    conf = cfg.load()
-    if not conf["ui"].get("show_tool_calls", True):
-        return
-    args_preview = ", ".join(f"{k}={repr(v)[:30]}" for k, v in args.items())
-    console.print(f"  [dim cyan]↳ [tool: {tool_name}] {args_preview}[/dim cyan]")
+    _tool_event_buffer.append(("call", tool_name, args))
 
 
 async def _on_tool_result(tool_name: str, result: str) -> None:
-    conf = cfg.load()
-    if not conf["ui"].get("show_tool_calls", True):
-        return
-    preview = result[:80].replace("\n", " ")
-    console.print(f"  [dim green]  ✓ {preview}{'...' if len(result) > 80 else ''}[/dim green]")
+    _tool_event_buffer.append(("result", tool_name, result))
 
 
 async def _confirm(prompt: str) -> bool:
@@ -335,7 +381,7 @@ def _handle_slash_command(
         )
         console.print(f"\n  Active model: [green]{current}[/green] ({mode})\n")
 
-    elif command == "verbose":
+    elif command in ("verbose", "v"):
         verbose[0] = not verbose[0]
         state = "[green]ON[/green]" if verbose[0] else "[dim]OFF[/dim]"
         console.print(f"  Verbose mode: {state}\n")

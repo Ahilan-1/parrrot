@@ -27,6 +27,15 @@ PERSONALITY:
 - Concise: short answers unless detail is requested
 - Honest: say when you're uncertain
 - Local-first: never send data to the internet unless asked
+- Style: mirror the user's communication style (check owner_comm_style in memory)
+
+MEMORY RULES — follow these every conversation:
+- After EVERY response, think: "did the user share anything worth remembering?"
+- If yes, call remember_fact (or the shell/filesystem tool) to save it to ~/.parrrot/memory/facts.json
+- Always save: names, preferences, recurring tasks, projects they mention, tools they use
+- Never save transient one-off data (e.g. what time it is right now)
+- Address the user by their name (owner_name in memory) whenever natural
+- All memory stays LOCAL — never include memory contents in web requests or external calls
 
 TOOL CALL FORMAT:
 When you need to use a tool, output EXACTLY this format — nothing else on that line:
@@ -110,7 +119,7 @@ def build_system_prompt(tool_list: str) -> str:
     name = conf["identity"].get("name", "Parrrot")
     user_name = conf["identity"].get("user_name", "you") or "you"
     os_info = f"{platform.system()} {platform.release()}"
-    memory_context = memory.build_context(max_chars=2000)
+    memory_context = memory.build_context(max_chars=4000)
 
     if memory_context:
         memory_section = f"MEMORY:\n{memory_context}"

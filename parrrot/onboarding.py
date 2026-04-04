@@ -436,12 +436,14 @@ def _step_permissions(config: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Step 4 — Name
+# Step 4 — Name + Owner profile
 # ---------------------------------------------------------------------------
 
 
 def _step_name(config: dict[str, Any]) -> None:
-    _step_header(4, 6, "Give Parrrot a name")
+    from parrrot.core import memory as mem
+
+    _step_header(4, 6, "Let's get acquainted")
 
     console.print(
         "  What should I call myself?\n"
@@ -456,7 +458,55 @@ def _step_name(config: dict[str, Any]) -> None:
     user_name = Prompt.ask("  And what's your name?", default="").strip()
     if user_name:
         config["identity"]["user_name"] = user_name
-    _success(f"Hello, [bold]{user_name or 'there'}[/bold]! I'll be your [bold cyan]{name}[/bold cyan].")
+
+    # --- deeper owner profiling ---
+    console.print()
+    console.print(f"  [bold]Help me know you better, {user_name or 'you'}.[/bold]")
+    console.print("  [dim]These are saved locally — nothing leaves your machine.[/dim]\n")
+
+    role = Prompt.ask(
+        "  What do you do? [dim](e.g. developer, student, designer — press Enter to skip)[/dim]",
+        default="",
+    ).strip()
+
+    location = Prompt.ask(
+        "  Where are you based? [dim](city or country, optional)[/dim]",
+        default="",
+    ).strip()
+
+    interests = Prompt.ask(
+        "  Interests or hobbies? [dim](optional, helps me give better suggestions)[/dim]",
+        default="",
+    ).strip()
+
+    console.print()
+    console.print("  How should I talk to you?")
+    console.print("  [[bold cyan]1[/bold cyan]] Casual and friendly")
+    console.print("  [[bold cyan]2[/bold cyan]] Professional and concise")
+    style_choice = Prompt.ask("  Style", default="1").strip()
+    comm_style = "casual" if style_choice != "2" else "professional"
+
+    # Save all owner facts to memory immediately
+    if user_name:
+        mem.remember("owner_name", user_name)
+    if role:
+        mem.remember("owner_role", role)
+    if location:
+        mem.remember("owner_location", location)
+    if interests:
+        mem.remember("owner_interests", interests)
+    mem.remember("owner_comm_style", comm_style)
+    mem.remember("assistant_name", name)
+
+    config["identity"]["role"] = role
+    config["identity"]["comm_style"] = comm_style
+
+    console.print()
+    _success(
+        f"Got it! I'll remember you, [bold]{user_name or 'friend'}[/bold], "
+        f"and speak in a [bold cyan]{comm_style}[/bold cyan] style."
+    )
+    _success(f"My name: [bold cyan]{name}[/bold cyan].")
 
 
 # ---------------------------------------------------------------------------

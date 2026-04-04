@@ -20,3 +20,13 @@ htmlcov/
 coverage.xml
 *.log
 .claude/
+
+# Parrrot runtime data — never commit personal memory, secrets, or config
+.parrrot/
+memory/
+facts.json
+events.json
+tasks.json
+conversations.json
+secrets.json
+*.key
