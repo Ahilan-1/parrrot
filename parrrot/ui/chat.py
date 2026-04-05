@@ -47,10 +47,52 @@ _THINKING_VERBS = [
     "weaving",
     "manifesting",
     "computing",
+
+    # funny / chaotic ones
+    "vibing",
+    "pondering",
+    "brainstorming",
+    "overthinking",
+    "debugging reality",
+    "consulting the void",
+    "asking the universe",
+    "sacrificing RAM",
+    "tickling the CPU",
+    "polishing the neurons",
+    "charging braincells",
+    "summoning brainpower",
+    "consulting ancient scrolls",
+    "rolling the logic dice",
+    "doing wizard math",
+    "shaking the knowledge tree",
+    "waking up the hamsters",
+    "turning the gears",
+    "bending the matrix",
+    "compressing thoughts",
+    "decrypting the cosmos",
+    "sharpening pencils",
+    "rewiring neurons",
+    "brewing coffee",
+    "summoning caffeine",
+    "aligning the planets",
+    "thinking really hard",
+    "consulting the archives",
+    "opening forbidden books",
+    "rebooting brain.exe",
+    "optimizing braincells",
+    "connecting the dots",
+    "whispering to the servers",
+    "staring into the abyss",
+    "feeding the algorithms",
+    "warming up the GPU",
+    "inventing logic",
+    "doing questionable math",
+    "pretending to understand",
 ]
 
-# Buffer for tool events — filled during agent run, printed after answer if verbose
-_tool_event_buffer: list[tuple[str, str, object]] = []
+# Rolling live display for tool events (shown during agent run, max 5 lines)
+_tool_live: Optional[Live] = None
+_tool_lines: list[str] = []
 
 # All slash commands available in chat
 _SLASH_COMMANDS = [
@@ -241,13 +283,14 @@ async def run_chat(one_shot_message: Optional[str] = None) -> None:
                 break
             continue
 
-        await _handle_message(agent, name, user_input, verbose=verbose[0])
+        await _handle_message(agent, name, user_input)
 
 
 async def _handle_message(
     agent, name: str, user_input: str, verbose: bool = False
 ) -> None:
-    _tool_event_buffer.clear()
+    global _tool_live, _tool_lines
+    _tool_lines = []
 
     response_tokens: list[str] = []
 
@@ -257,10 +300,17 @@ async def _handle_message(
     verb = random.choice(_THINKING_VERBS)
 
     try:
-        with console.status(
-            f"[dim cyan]{name} is {verb}…[/dim cyan]", spinner="dots"
-        ):
+        # transient=True wipes the live area after the context exits so the
+        # final answer panel prints cleanly below it
+        with Live(
+            Text(f"  {name} is {verb}…", style="dim cyan"),
+            console=console,
+            refresh_per_second=8,
+            transient=True,
+        ) as live:
+            _tool_live = live
             response = await agent.think_and_act(user_input, stream_callback=collect_token)
+            _tool_live = None
 
         full_response = "".join(response_tokens) or response or ""
 
@@ -283,21 +333,8 @@ async def _handle_message(
         else:
             console.print(f"\n  [dim]{name}: (no response)[/dim]")
 
-        # Show tool trace after the answer — only when verbose is on
-        if verbose and _tool_event_buffer:
-            console.print()
-            console.print("  [dim]── tool trace ──[/dim]")
-            for event_type, tool_name, data in _tool_event_buffer:
-                if event_type == "call":
-                    args_preview = ", ".join(
-                        f"{k}={repr(v)[:30]}" for k, v in (data or {}).items()  # type: ignore[union-attr]
-                    )
-                    console.print(f"  [dim cyan]↳ {tool_name}({args_preview})[/dim cyan]")
-                else:
-                    preview = str(data)[:100].replace("\n", " ")
-                    console.print(f"  [dim green]  ✓ {preview}{'…' if len(str(data)) > 100 else ''}[/dim green]")
-
     except Exception as e:
+        _tool_live = None
         console.print()
         _show_error(name, str(e))
 
@@ -305,17 +342,38 @@ async def _handle_message(
 
 
 async def _on_tool_call(tool_name: str, args: dict) -> None:
-    _tool_event_buffer.append(("call", tool_name, args))
+    global _tool_live, _tool_lines
+    args_preview = ", ".join(f"{k}={repr(v)[:40]}" for k, v in (args or {}).items())
+    _tool_lines.append(f"  [dim cyan]⚙ {tool_name}({args_preview})[/dim cyan]")
+    if len(_tool_lines) > 5:
+        _tool_lines.pop(0)  # rolling: drop the oldest line
+    if _tool_live is not None:
+        _tool_live.update(Text.from_markup("\n".join(_tool_lines)))
 
 
 async def _on_tool_result(tool_name: str, result: str) -> None:
-    _tool_event_buffer.append(("result", tool_name, result))
+    global _tool_live, _tool_lines
+    preview = str(result)[:100].replace("\n", " ")
+    suffix = "…" if len(str(result)) > 100 else ""
+    _tool_lines.append(f"  [dim green]  ✓ {preview}{suffix}[/dim green]")
+    if len(_tool_lines) > 5:
+        _tool_lines.pop(0)
+    if _tool_live is not None:
+        _tool_live.update(Text.from_markup("\n".join(_tool_lines)))
 
 
 async def _confirm(prompt: str) -> bool:
     from rich.prompt import Confirm
+    global _tool_live
+    # Stop the live display so the confirm prompt is visible and input works
+    if _tool_live is not None:
+        _tool_live.stop()
     console.print()
-    return Confirm.ask(f"  [bold yellow]⚠[/bold yellow]  {prompt}", default=False)
+    result = Confirm.ask(f"  [bold yellow]⚠[/bold yellow]  {prompt}", default=False)
+    console.print()
+    if _tool_live is not None:
+        _tool_live.start()
+    return result
 
 
 def _show_error(name: str, error: str) -> None:

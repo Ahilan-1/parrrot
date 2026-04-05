@@ -115,70 +115,62 @@ async def _read_current_email() -> str:
 
 async def _compose_gmail(to: str, subject: str, body: str) -> str:
     """
-    Compose a new Gmail message using OCR + keyboard.
-    Clicks Compose, fills To/Subject/Body fields, but does NOT send yet.
-    Call send_current_email() to send after reviewing.
+    Compose a new Gmail message using keyboard navigation.
+    Clicks Compose, then uses Tab to move between To → Subject → Body.
+    Does NOT send — call send_current_email() after reviewing.
     """
-    from parrrot.tools.screen import _ask_screen, _wait_for_element
+    from parrrot.tools.screen import _ask_screen
     from parrrot.tools.pc_control import _ocr_click, _smart_click, _type_paste
+
+    try:
+        import pyautogui
+    except ImportError:
+        return "Error: pyautogui is required for compose_gmail"
 
     steps: list[str] = []
 
-    # Step 1: Click Compose button (OCR finds the text "Compose" directly)
+    # Step 1: Click Compose button
     r = _ocr_click("Compose")
     if "Could not find" in r:
-        r = await _smart_click("Compose button")
+        r = await _smart_click("Compose button in Gmail")
     steps.append(r)
-    time.sleep(1.5)
+    time.sleep(2.0)  # Wait for compose popup to fully open
 
-    # Step 2: Click To field and type recipient
-    r = _ocr_click("To")
-    if "Could not find" in r:
-        r = await _smart_click("To: field in compose")
+    # Step 2: Click the To field precisely, then type the recipient.
+    # Use smart_click with a clear description so it targets the input, not the label.
+    r = await _smart_click("recipient email address input field inside the compose popup")
     steps.append(r)
-    time.sleep(0.3)
-    try:
-        import pyautogui
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.1)
-    except ImportError:
-        pass
+    time.sleep(0.5)
     r = _type_paste(to)
     steps.append(f"Typed To: {r}")
-    time.sleep(0.3)
+    time.sleep(0.5)
 
-    # Tab to Subject
-    try:
-        import pyautogui
-        pyautogui.press("tab")
-        time.sleep(0.2)
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.1)
-    except ImportError:
-        pass
+    # Tab once: confirms the email address chip and moves focus to Subject
+    pyautogui.press("tab")
+    time.sleep(0.6)
 
-    # Step 3: Type subject
+    # Step 3: Type Subject directly — focus is now on the Subject field from Tab.
+    # Do NOT click anything here; clicking resets focus and causes content to land in To.
     r = _type_paste(subject)
     steps.append(f"Typed Subject: {r}")
-    time.sleep(0.3)
+    time.sleep(0.5)
 
-    # Tab to body
-    try:
-        import pyautogui
-        pyautogui.press("tab")
-        time.sleep(0.2)
-    except ImportError:
-        pass
+    # Tab once: moves focus to the message body
+    pyautogui.press("tab")
+    time.sleep(0.6)
 
-    # Step 4: Type body
+    # Step 4: Click body area to be safe, then type
+    r = await _smart_click("email message body text area in the compose window")
+    steps.append(r)
+    time.sleep(0.4)
     r = _type_paste(body)
     steps.append(f"Typed body: {r}")
     time.sleep(0.3)
 
-    # Confirm compose state
+    # Verify the compose state
     confirm = await _ask_screen(
-        "Is there a Gmail compose window open with a filled To field, Subject, and message body? "
-        "What does it show?"
+        "Is there a Gmail compose window open? "
+        "Read out exactly what is in the To field, the Subject field, and the first line of the body."
     )
     steps.append(f"Compose state: {confirm}")
 
