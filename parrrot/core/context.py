@@ -11,6 +11,7 @@ import platform
 from parrrot import config as cfg
 from parrrot.core import memory
 
+#Dont change the formatting of this template — the agent relies on it to understand tools, rules, and how to call tools. Only update the content when needed.
 
 _SYSTEM_TEMPLATE = """\
 You are {name}, a powerful personal AI assistant running on {user_name}'s computer.
